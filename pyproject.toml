@@ -44,6 +44,14 @@ manus = [
     "pyzmq>=25.0",
     "manus-client @ https://github.com/orcahand/manus-client/releases/download/v0.1.0/manus_client-0.1.0-py3-none-manylinux_2_35_x86_64.whl",
 ]
+wilor = [
+    # Headless build: WiLorCameraSource only captures/encodes frames, never
+    # displays them, so it doesn't need opencv-python's GUI (libGL) deps.
+    "opencv-python-headless",
+    # webpolicy 0.1.0 requires Python>=3.11; the project floor is 3.10 for
+    # its other extras, so this is scoped rather than raising requires-python.
+    "webpolicy; python_version >= '3.11'",
+]
 sim = [
     "orca_sim @ git+https://github.com/orcahand/orca_sim.git@main"
 ]
@@ -86,3 +94,10 @@ select = ["E", "F", "I", "W", "UP", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+
+[tool.uv.sources]
+webpolicy = { git = "https://github.com/mhyatt000/webpolicy" }
+# Local, editable checkout — not the pinned upstream @main — so this picks up
+# live orca_core changes (disabled_motor_ids/disabled_joint_ids and friends)
+# without waiting for them to land upstream.
+orca_core = { path = "../", editable = true }
