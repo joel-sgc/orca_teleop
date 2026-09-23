@@ -264,8 +264,21 @@ class OrcaHandSimSink(RecordableSink):
             self._record_camera = None
 
     def _to_action_array(self, positions: OrcaJointPositions) -> np.ndarray:
-        # Retargeter outputs degrees; MuJoCo accepts radians
-        return np.deg2rad(positions.as_array(self._actuator_joint_names))
+        # Retargeter outputs degrees; MuJoCo accepts radians. A joint on a
+        # disabled motor is absent from the retargeter's action (not NaN),
+        # so it falls back to its neutral pose here instead of being sent
+        # to the sim as NaN.
+        assert self._hand_config is not None, "connect() must be called before dispatch_action()"
+        position_data = positions.as_dict()
+        neutral = self._hand_config.neutral_position
+        deg = np.array(
+            [
+                position_data.get(joint, neutral.get(joint, 0.0))
+                for joint in self._actuator_joint_names
+            ],
+            dtype=np.float64,
+        )
+        return np.deg2rad(deg)
 
     def _load_hand_config(self) -> Any:
         """Load the orca_core hand config matching this sim env (joint ids +

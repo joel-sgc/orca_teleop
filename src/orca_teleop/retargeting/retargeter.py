@@ -160,6 +160,9 @@ class RetargeterConfig:
     joint_regularizers: tuple[tuple[str, float, float], ...] = field(
         default=_DEFAULT_JOINT_REGULARIZERS
     )
+    # Motors disabled on the physical hand: solved for like any other joint,
+    # but dropped from the emitted action so nothing ever commands them.
+    disabled_joint_ids: frozenset[str] = frozenset()
 
     @classmethod
     def from_paths(
@@ -302,6 +305,7 @@ class RetargeterConfig:
             ik_loss=ik_loss if ik_loss is not None else weighted_vector_loss(),
             regularization_weight=regularization_weight,
             joint_regularizers=joint_regularizers,
+            disabled_joint_ids=frozenset(hand.config.disabled_joint_ids),
         )
 
 
@@ -498,9 +502,10 @@ class Retargeter:
         # Step 6: convert to physical degrees and assemble the action
         finger_phys_deg = self._finger_angles_urdf_to_physical(finger_urdf_deg)
         wrist_signed = wrist_phys_deg if cfg.hand_type == "left" else -wrist_phys_deg
-        return OrcaJointPositions(
-            {
-                **dict(zip(cfg.finger_joint_ids, finger_phys_deg, strict=True)),
-                cfg.wrist_joint_id: wrist_signed,
-            }
-        )
+        action = {
+            **dict(zip(cfg.finger_joint_ids, finger_phys_deg, strict=True)),
+            cfg.wrist_joint_id: wrist_signed,
+        }
+        if cfg.disabled_joint_ids:
+            action = {j: v for j, v in action.items() if j not in cfg.disabled_joint_ids}
+        return OrcaJointPositions(action)

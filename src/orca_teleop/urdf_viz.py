@@ -222,7 +222,7 @@ class OrcaHandUrdfVizSink(RobotSink):
                 self._ref_offsets.get(urdf_suffix, 0.0),
             )
             value_deg = float(
-                position_data.get(joint_id, self._hand.config.neutral_position[joint_id])
+                position_data.get(joint_id, self._hand.config.neutral_position.get(joint_id, 0.0))
             )
             qpos[q_idx] = np.deg2rad(value_deg) - ref_offset
         return qpos

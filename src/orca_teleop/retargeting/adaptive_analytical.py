@@ -226,6 +226,10 @@ class AdaptiveAnalyticalRetargeter:
         self._calibration_mags: list[np.ndarray] = []
         self._calibration_done: bool = False
         self._last_qpos_phys: np.ndarray | None = None
+        # Motors disabled on the physical hand: solved for like any other
+        # joint (cheap, and keeps the IK's DOF count/Jacobians untouched),
+        # but dropped from the emitted action so nothing ever commands them.
+        self._disabled_joint_ids = frozenset(self._hand.config.disabled_joint_ids)
 
     @classmethod
     def from_paths(
@@ -272,12 +276,13 @@ class AdaptiveAnalyticalRetargeter:
         )
         wrist_signed = wrist_phys_deg if self.hand_type == "left" else -wrist_phys_deg
 
-        return OrcaJointPositions(
-            {
-                **dict(zip(self._finger_joint_ids, finger_phys_deg, strict=True)),
-                self._wrist_joint_id: wrist_signed,
-            }
-        )
+        action = {
+            **dict(zip(self._finger_joint_ids, finger_phys_deg, strict=True)),
+            self._wrist_joint_id: wrist_signed,
+        }
+        if self._disabled_joint_ids:
+            action = {j: v for j, v in action.items() if j not in self._disabled_joint_ids}
+        return OrcaJointPositions(action)
 
     def _load_frame_map(self, config: dict[str, Any]) -> _FrameMap:
         versioned_cfg = config.get("robot_frames_by_version", {}).get(self.model_version, {})
