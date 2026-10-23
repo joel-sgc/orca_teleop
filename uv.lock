@@ -1719,6 +1719,22 @@ wheels = [
 ]
 
 [[package]]
+name = "leap"
+version = "0.0.1"
+source = { directory = "../leapc-python-bindings/leapc-python-api" }
+
+[[package]]
+name = "leapc-cffi"
+version = "0.0.1"
+source = { directory = "../leapc-python-bindings/leapc-cffi" }
+dependencies = [
+    { name = "cffi" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "cffi" }]
+
+[[package]]
 name = "lerobot"
 version = "0.4.4"
 source = { registry = "https://pypi.org/simple" }
@@ -2660,6 +2676,10 @@ adaptive = [
 avp = [
     { name = "avp-stream" },
 ]
+leap = [
+    { name = "leap" },
+    { name = "leapc-cffi" },
+]
 learning = [
     { name = "aiohttp" },
     { name = "cmeel-tinyxml2" },
@@ -2700,6 +2720,8 @@ requires-dist = [
     { name = "cmeel-tinyxml2", marker = "extra == 'adaptive'", specifier = "<11" },
     { name = "cmeel-urdfdom", marker = "extra == 'adaptive'", specifier = "<5" },
     { name = "grpcio", specifier = ">=1.62.3" },
+    { name = "leap", marker = "extra == 'leap'", directory = "../leapc-python-bindings/leapc-python-api" },
+    { name = "leapc-cffi", marker = "extra == 'leap'", directory = "../leapc-python-bindings/leapc-cffi" },
     { name = "lerobot", marker = "extra == 'learning'", specifier = ">=0.4,<0.5" },
     { name = "manus-client", marker = "extra == 'manus'", url = "https://github.com/orcahand/manus-client/releases/download/v0.1.0/manus_client-0.1.0-py3-none-manylinux_2_35_x86_64.whl" },
     { name = "mediapipe-numpy2", marker = "extra == 'mediapipe'" },
@@ -2719,7 +2741,7 @@ requires-dist = [
     { name = "torch", specifier = ">=2.8.0" },
     { name = "webpolicy", marker = "python_full_version >= '3.11' and extra == 'wilor'", git = "https://github.com/mhyatt000/webpolicy" },
 ]
-provides-extras = ["test", "mediapipe", "adaptive", "avp", "metaquest", "manus", "wilor", "sim", "learning"]
+provides-extras = ["test", "mediapipe", "adaptive", "avp", "metaquest", "manus", "wilor", "sim", "leap", "learning"]
 
 [[package]]
 name = "orderly-set"

@@ -56,6 +56,7 @@ from orca_teleop.constants import (
 )
 from orca_teleop.ingress.server import HandLandmarks, IngressServer
 from orca_teleop.retargeting.retargeter import Retargeter, RetargeterBackend, TargetPose
+from orca_teleop.step_gate import KeyGate
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,52 @@ def _shutdown_queue(q: "queue.Queue[Any]") -> None:
         q.put_nowait(_SHUTDOWN)
     except queue.Full:
         pass
+
+
+def _step_gated_queue(
+    source_q: "queue.Queue[OrcaJointPositions | object]",
+    stop_event: threading.Event,
+    gate: "KeyGate",
+) -> "queue.Queue[OrcaJointPositions | object]":
+    """Wrap ``source_q`` so the returned queue only yields the *latest*
+    upstream item, and only once per ``gate.consume()`` (i.e. once per
+    keypress) — never a stale backlog. ``_SHUTDOWN`` passes through
+    immediately regardless of gate state, so shutdown isn't blocked on a
+    keypress that may never come.
+    """
+    gated_q: queue.Queue[OrcaJointPositions | object] = queue.Queue(maxsize=1)
+
+    def _pump() -> None:
+        latest: OrcaJointPositions | None = None
+        while not stop_event.is_set():
+            try:
+                item = source_q.get(timeout=HEARTBEAT_INTERVAL)
+            except queue.Empty:
+                item = None
+            if item is _SHUTDOWN:
+                _shutdown_queue(gated_q)
+                return
+            if item is not None:
+                latest = item
+            if latest is not None and gate.consume():
+                # Keep only the newest triggered target: if the sink hasn't
+                # drained the previous one yet, replace it rather than
+                # dropping this (newer) request.
+                try:
+                    gated_q.put_nowait(latest)
+                except queue.Full:
+                    try:
+                        gated_q.get_nowait()
+                    except queue.Empty:
+                        pass
+                    try:
+                        gated_q.put_nowait(latest)
+                    except queue.Full:
+                        pass
+        _shutdown_queue(gated_q)
+
+    threading.Thread(target=_pump, name="step-gate-pump", daemon=True).start()
+    return gated_q
 
 
 @dataclass
@@ -407,6 +454,7 @@ def run(
     retargeter_backend: RetargeterBackend = "adaptive_analytical",
     retargeter_config_path: str | None = None,
     landmark_source: LandmarkSource = "mediapipe",
+    step_gate: bool = False,
 ) -> None:
     """Start the full teleop pipeline:
     - gRPC-ingress -> retargeter -> robot consumer
@@ -430,6 +478,12 @@ def run(
         landmark_source: Landmark convention received over gRPC. Live ``webxr``
             frames are already in the canonical 21-point layout; legacy
             ``metaquest`` HTS/Unity replays still need their historical mirror.
+        step_gate: When True, the sink only advances to the latest retargeted
+            pose once per keypress (tap SPACE to step once; hold it to stream
+            continuously via the terminal's own key-repeat) instead of
+            streaming every frame automatically. Calibration still runs in
+            the background regardless. Requires an interactive terminal —
+            silently streams freely otherwise (see ``KeyGate``).
     """
     if sink is None:
         sink = OrcaHandSink(model_path)
@@ -473,14 +527,23 @@ def run(
     )
     retargeter_thread.start()
 
+    key_gate = None
+    action_q = queues.actions_q
+    if step_gate:
+        key_gate = KeyGate()
+        key_gate.start()
+        action_q = _step_gated_queue(queues.actions_q, stop_event, key_gate)
+
     try:
-        sink.run_loop(queues.actions_q, stop_event)
+        sink.run_loop(action_q, stop_event)
     except KeyboardInterrupt:
         pass
     finally:
         stop_event.set()
         ingress_server.stop()
         retargeter_thread.join(timeout=JOIN_TIMEOUT)
+        if key_gate is not None:
+            key_gate.stop()
         sink.close()
         if landmarks_viz is not None:
             landmarks_viz.stop()

@@ -45,6 +45,21 @@ import threading
 from dataclasses import dataclass
 from typing import Any
 
+import matplotlib._c_internal_utils
+
+# On some XWayland setups matplotlib's own display probe (used to decide
+# whether any interactive backend is usable at all) returns a false negative
+# even though a real GUI window opens fine, and that "headless" verdict gets
+# locked in for the process on the first plt.figure()/plt.show() call —
+# neither switch_backend() nor MPLBACKEND can undo it afterwards. Patching
+# the probe is the only way to unblock it; this must run before the first
+# `import matplotlib.pyplot`.
+matplotlib._c_internal_utils.display_is_valid = lambda: True
+
+import matplotlib
+
+matplotlib.use("TkAgg")
+
 import matplotlib.pyplot as plt
 import numpy as np
 import torch

@@ -16,6 +16,10 @@ Example:
     python -m orca_teleop.ingress.wilor.publisher \\
         --server localhost:50051 --hand right \\
         --wilor-host <wilor-server-host> --wilor-port 8084
+
+Add --step-gate to move the hand one captured pose at a time instead of
+streaming continuously: tap SPACE (in this script's terminal) to advance one
+step, hold it down to stream freely for as long as it's held.
 """
 
 from __future__ import annotations
@@ -53,6 +57,15 @@ def main() -> None:
         help="Open a live 3D matplotlib window showing hand keypoints",
     )
     parser.add_argument(
+        "--step-gate",
+        action="store_true",
+        help=(
+            "Move one step per SPACE tap instead of streaming continuously; "
+            "hold SPACE to stream freely while held. Needs this terminal to "
+            "stay focused/interactive."
+        ),
+    )
+    parser.add_argument(
         "--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"]
     )
     args = parser.parse_args()
@@ -70,6 +83,7 @@ def main() -> None:
         visualize_landmarks=args.visualize_landmarks,
         retargeter_backend=args.retargeter,
         retargeter_config_path=args.retarget_config,
+        step_gate=args.step_gate,
     )
 
 

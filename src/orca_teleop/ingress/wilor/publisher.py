@@ -115,6 +115,7 @@ class WiLorPublisher:
         self._latest_keypoints: np.ndarray | None = None
         self._fresh = False
         self._stop = threading.Event()
+        self._last_frame_state: str | None = None
 
     def _source_reader(self) -> None:
         """Background thread: poll ``read_frame``, reconnecting on failure.
@@ -135,6 +136,14 @@ class WiLorPublisher:
                 continue
 
             backoff.reset()
+            if frame is None:
+                state = "no frame"
+            else:
+                state = f"frame handedness={frame.handedness!r}"
+            if state != self._last_frame_state:
+                self._last_frame_state = state
+                logger.info("WiLoR source: %s (want: %s)", state, self._handedness)
+
             if frame is None:
                 time.sleep(_POLL_PERIOD_S)
                 continue

@@ -55,6 +55,10 @@ wilor = [
 sim = [
     "orca_sim @ git+https://github.com/orcahand/orca_sim.git@main"
 ]
+leap = [
+    "leapc_cffi",
+    "leap",
+]
 learning = [
     # `uv sync --extra learning` is enough for dataset recording/training.
     "orca_teleop[mediapipe,metaquest,adaptive]",
@@ -101,3 +105,20 @@ webpolicy = { git = "https://github.com/mhyatt000/webpolicy" }
 # live orca_core changes (disabled_motor_ids/disabled_joint_ids and friends)
 # without waiting for them to land upstream.
 orca_core = { path = "../", editable = true }
+# leapc_cffi's setup.py builds against a local Ultraleap Gemini Hand Tracking
+# install (LeapC.h + libLeapC.so) — on NixOS those are provided via FHS-path
+# symlinks (services.ultraleap in ~/.nixos), not a real /usr install. Since
+# Gemini isn't present on every machine this project runs on, `uv sync`
+# (which always re-resolves every optional-dependency's build, not just the
+# ones selected by --extra) would break project-wide without it — so this is
+# scoped to a machine that actually has Gemini installed.
+#
+# `path`, not `git`: setup.py copies LeapC.h/libLeapC.so into its own source
+# tree at build time (see LEAPC_HEADER_OVERRIDE/LEAPC_LIB_OVERRIDE below),
+# but uv's git-checkout cache is deliberately read-only, so that copy fails
+# with a PermissionError regardless of --no-cache. A plain `git clone` (not
+# uv's) is a normal writable directory, so a local path sidesteps it. Clone
+# as a sibling of this checkout:
+#   cd ../ && git clone https://github.com/ultraleap/leapc-python-bindings
+leapc_cffi = { path = "../leapc-python-bindings/leapc-cffi" }
+leap = { path = "../leapc-python-bindings/leapc-python-api" }
